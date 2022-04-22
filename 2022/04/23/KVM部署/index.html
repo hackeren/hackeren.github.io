@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="KVM部署创建时间: April 22, 2022 4:19 PM 概述KVM qemu libvirt的关系KVM作为开源的硬件虚拟化技术组件，一般使用libvirt来进行管理。一般会称为 qemu-KVM 。那么三者的关系是如何的呢？  KVM：通估辅助硬件虚拟机化技术intel-VT、AMD-V来实现CPU、内存虚拟化、 qemu：负责虚拟化IO设备，包括网卡、磁盘。当然qemu也可以用来模">
+<meta property="og:type" content="article">
+<meta property="og:title" content="KVM部署">
+<meta property="og:url" content="http://example.com/2022/04/23/KVM%E9%83%A8%E7%BD%B2/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="KVM部署创建时间: April 22, 2022 4:19 PM 概述KVM qemu libvirt的关系KVM作为开源的硬件虚拟化技术组件，一般使用libvirt来进行管理。一般会称为 qemu-KVM 。那么三者的关系是如何的呢？  KVM：通估辅助硬件虚拟机化技术intel-VT、AMD-V来实现CPU、内存虚拟化、 qemu：负责虚拟化IO设备，包括网卡、磁盘。当然qemu也可以用来模">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/2022/04/23/KVM%E9%83%A8%E7%BD%B2/Untitled.png">
+<meta property="og:image" content="http://example.com/2022/04/23/KVM%E9%83%A8%E7%BD%B2/Untitled%201.png">
+<meta property="article:published_time" content="2022-04-22T23:04:11.000Z">
+<meta property="article:modified_time" content="2022-04-22T23:08:55.546Z">
+<meta property="article:author" content="John Doe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/2022/04/23/KVM%E9%83%A8%E7%BD%B2/Untitled.png">
+
+<link rel="canonical" href="http://example.com/2022/04/23/KVM%E9%83%A8%E7%BD%B2/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>KVM部署 | Hexo</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Hexo</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/04/23/KVM%E9%83%A8%E7%BD%B2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Hexo">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          KVM部署
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2022-04-23 07:04:11 / Modified: 07:08:55" itemprop="dateCreated datePublished" datetime="2022-04-23T07:04:11+08:00">2022-04-23</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="KVM部署"><a href="#KVM部署" class="headerlink" title="KVM部署"></a>KVM部署</h1><p>创建时间: April 22, 2022 4:19 PM</p>
+<h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><h2 id="KVM-qemu-libvirt的关系"><a href="#KVM-qemu-libvirt的关系" class="headerlink" title="KVM qemu libvirt的关系"></a>KVM qemu libvirt的关系</h2><p>KVM作为开源的硬件虚拟化技术组件，一般使用libvirt来进行管理。一般会称为 <code>qemu-KVM</code> 。那么三者的关系是如何的呢？</p>
+<ul>
+<li>KVM：通估辅助硬件虚拟机化技术intel-VT、AMD-V来实现CPU、内存虚拟化、</li>
+<li>qemu：负责虚拟化IO设备，包括网卡、磁盘。当然qemu也可以用来模拟CPU和内存，缺点就是太慢（纯软虚拟化）。</li>
+<li>libvirt：qemu-KVM的接口太过负责，为了抽象，使用libvirt命令来管理和使用qemu-KVM</li>
+</ul>
+<p><img src="/2022/04/23/KVM%E9%83%A8%E7%BD%B2/Untitled.png" alt="Untitled"></p>
+<p><img src="/2022/04/23/KVM%E9%83%A8%E7%BD%B2/Untitled%201.png" alt="Untitled"></p>
+<h2 id="KVM网络方案"><a href="#KVM网络方案" class="headerlink" title="KVM网络方案"></a>KVM网络方案</h2><p>KVM虚拟机部署中最重要的是网络方案，主要是两种：</p>
+<ul>
+<li>桥接网络：需要提供一张宿主机物理网卡，通过创建一个网桥，并将该物理网卡桥接到网桥上，同时该网桥需要配置一个物理IP，而需要桥接的虚拟机都桥接到该网桥上，即可以实现外网方案。</li>
+<li>NAT网络：libvirt会自动创建一个vir-br0（桥设备），而虚拟机则桥接到该桥设备上，通过iptables来将虚拟机的流量SNAT到外部。</li>
+</ul>
+<h1 id="部署"><a href="#部署" class="headerlink" title="部署"></a>部署</h1><h2 id="部署准备"><a href="#部署准备" class="headerlink" title="部署准备"></a>部署准备</h2><h3 id="机器准备"><a href="#机器准备" class="headerlink" title="机器准备"></a>机器准备</h3><figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">1</span>．首先，检查机器是否支持硬件辅助虚拟化，代码如下。</span><br><span class="line">cat /proc/CPUinfo | egrep <span class="string">&#x27;vmx|svm&#x27;</span> # 如果输出结果包含Intel的vmx或AMD的svm字段，则说明支持。</span><br><span class="line"><span class="number">2</span>．关闭SELinux，代码如下：</span><br><span class="line">vi /etc/sysconfig/seLinux</span><br><span class="line">set  SELinux=disabled</span><br><span class="line"><span class="number">3</span>．安装KVM相关工具软件：</span><br><span class="line">yum -y install qemu-kvm libvirt virt-install bridge-utils</span><br><span class="line">重启机器。</span><br><span class="line"><span class="number">4</span>．检查KVM模块是否加载完毕。</span><br><span class="line">lsmod | grep kv</span><br></pre></td></tr></table></figure>
+
+<h3 id="下载镜像"><a href="#下载镜像" class="headerlink" title="下载镜像"></a>下载镜像</h3><p>下载iso、dvd、img、qcow2等格式的镜像。</p>
+<h2 id="桥接网络方案"><a href="#桥接网络方案" class="headerlink" title="桥接网络方案"></a>桥接网络方案</h2><h3 id="网络配置"><a href="#网络配置" class="headerlink" title="网络配置"></a>网络配置</h3><ul>
+<li>桥设备创建</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">brctl addbr br0</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>桥设备配置</li>
+</ul>
+<p>修改br0的配置文件：</p>
+<p><code>vi /etc/sysconfig/network-scripts/ifcfg-br0</code></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">TYPE=Bridge</span><br><span class="line">PROXY_METHOD=none</span><br><span class="line">BROWSER_ONLY=no</span><br><span class="line">BOOTPROTO=static</span><br><span class="line">DEFROUTE=yes</span><br><span class="line">IPV4_FAILURE_FATAL=no</span><br><span class="line">IPV6INIT=yes</span><br><span class="line">IPV6_AUTOCONF=yes</span><br><span class="line">IPV6_DEFROUTE=yes</span><br><span class="line">IPV6_FAILURE_FATAL=no</span><br><span class="line">IPV6_ADDR_GEN_MODE=stable-privacy</span><br><span class="line">NAME=br0</span><br><span class="line">UUID=612eff0a-16d0-46fe-a7db-57eb813fdeb9</span><br><span class="line">DEVICE=br0</span><br><span class="line">IPADDR=172.18.107.236</span><br><span class="line">NETMASK=255.255.255.0</span><br><span class="line">GATEWAY=172.18.107.1</span><br><span class="line">DNS1=8.8.8.8</span><br><span class="line">DNS2=114.114.114.114</span><br><span class="line">ONBOOT=yes</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>物理网卡配置</li>
+</ul>
+<p><code>vi /etc/sysconfig/network-scripts/ifcfg-enp175s0f0</code></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">TYPE=Ethernet</span><br><span class="line">ONBOOT=yes</span><br><span class="line">BRIDGE=br0 <span class="comment"># 桥接到br0上</span></span><br><span class="line">DEVICE=enp175s0f0</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>重启网络</li>
+</ul>
+<p>systemctl restart network</p>
+<h3 id="虚拟机安装"><a href="#虚拟机安装" class="headerlink" title="虚拟机安装"></a>虚拟机安装</h3><ul>
+<li>无vnc方式</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">virt-install \</span><br><span class="line">--virt-type=kvm \</span><br><span class="line">--name=centos7-vm1 \</span><br><span class="line">--vcpus=2 \</span><br><span class="line">--memory=4096 \</span><br><span class="line">--location=/home/renlanhui/kvm/CentOS-7-x86_64-Minimal-2009.iso \</span><br><span class="line">--disk path=/home/renlanhui/kvm/vfs/vm1.qcow2,size=40,format=qcow2 \</span><br><span class="line">--network bridge=br0 \</span><br><span class="line">--graphics none \</span><br><span class="line">--extra-args=<span class="string">&#x27;console=ttyS0&#x27;</span> \</span><br><span class="line">--force</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>vnc方式</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">virt-install \</span><br><span class="line">--virt-type=kvm \</span><br><span class="line">--name=centos7-vm1 \</span><br><span class="line">--vcpus=2 \</span><br><span class="line">--memory=4096 \</span><br><span class="line">--location=/home/renlanhui/kvm/CentOS-7-x86_64-Minimal-2009.iso \</span><br><span class="line">--disk path=/home/renlanhui/kvm/vfs/vm1.qcow2,size=40,format=qcow2 \</span><br><span class="line">--network bridge=br0 \</span><br><span class="line">--graphics vnc,listen=0.0.0.0,port=7788</span><br><span class="line">--extra-args=<span class="string">&#x27;console=ttyS0&#x27;</span> \</span><br><span class="line">--force</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>qcow镜像安装</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">virt-install \</span><br><span class="line">--virt-type=kvm \</span><br><span class="line">--name=centos7-vm1 \</span><br><span class="line">--vcpus=2 \</span><br><span class="line">--memory=4096 \</span><br><span class="line">--import --disk path=/home/renlanhui/kvm/vfs/vm1.qcow2,size=40,format=qcow2 \</span><br><span class="line">--network bridge=br0</span><br><span class="line">--graphics none \</span><br><span class="line">--force</span><br></pre></td></tr></table></figure>
+
+<h2 id="NAT网络方案"><a href="#NAT网络方案" class="headerlink" title="NAT网络方案"></a>NAT网络方案</h2><p>NAT方案比较简单，不需要配置网络，只需要在安装的时候指定对应的网络即可，默认是 <code>default</code></p>
+<h3 id="虚拟机安装-1"><a href="#虚拟机安装-1" class="headerlink" title="虚拟机安装"></a>虚拟机安装</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">virt-install \</span><br><span class="line">--virt-type=kvm \</span><br><span class="line">--name=centos7-vm2 \</span><br><span class="line">--vcpus=2 \</span><br><span class="line">--memory=4096 \</span><br><span class="line">--location=/home/renlanhui/kvm/CentOS-7-x86_64-Minimal-2009.iso \</span><br><span class="line">--disk path=/home/renlanhui/kvm/vfs/vm2.qcow2,size=40,format=qcow2 \</span><br><span class="line">--network network=default \</span><br><span class="line">--graphics none \</span><br><span class="line">--extra-args=<span class="string">&#x27;console=ttyS0&#x27;</span> \</span><br><span class="line">--force</span><br></pre></td></tr></table></figure>
+
+<h1 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h1><h2 id="常用命令"><a href="#常用命令" class="headerlink" title="常用命令"></a>常用命令</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># vm相关</span></span><br><span class="line">virsh <span class="built_in">suspend</span> vm-1 <span class="comment"># 挂起vm-1</span></span><br><span class="line">virsh undefine vm-1 <span class="comment"># 清除vm-1</span></span><br><span class="line">virsh destroy vm-1 <span class="comment"># 销毁运行中的vm-1</span></span><br><span class="line"></span><br><span class="line">virsh shutdown vm-1 <span class="comment"># 关闭vm-1</span></span><br><span class="line">virsh start vm-1 <span class="comment"># 启动vm-1</span></span><br><span class="line">virsh dumpxml vm-1 <span class="comment"># 查看xml配置</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 网络相关</span></span><br><span class="line">virsh net-edit default <span class="comment"># 编译默认网络</span></span><br><span class="line">virsh net-start default <span class="comment"># 启动默认网络</span></span><br><span class="line">virsh net-autostart default <span class="comment"># 自动启动默认网络</span></span><br></pre></td></tr></table></figure>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/07/10/%E9%98%B2%E5%BE%A1%E5%BC%8F%E7%BC%96%E7%A8%8B/" rel="prev" title="防御式编程">
+      <i class="fa fa-chevron-left"></i> 防御式编程
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#KVM%E9%83%A8%E7%BD%B2"><span class="nav-number">1.</span> <span class="nav-text">KVM部署</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A6%82%E8%BF%B0"><span class="nav-number">2.</span> <span class="nav-text">概述</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#KVM-qemu-libvirt%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="nav-number">2.1.</span> <span class="nav-text">KVM qemu libvirt的关系</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#KVM%E7%BD%91%E7%BB%9C%E6%96%B9%E6%A1%88"><span class="nav-number">2.2.</span> <span class="nav-text">KVM网络方案</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%83%A8%E7%BD%B2"><span class="nav-number">3.</span> <span class="nav-text">部署</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%83%A8%E7%BD%B2%E5%87%86%E5%A4%87"><span class="nav-number">3.1.</span> <span class="nav-text">部署准备</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%BA%E5%99%A8%E5%87%86%E5%A4%87"><span class="nav-number">3.1.1.</span> <span class="nav-text">机器准备</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8B%E8%BD%BD%E9%95%9C%E5%83%8F"><span class="nav-number">3.1.2.</span> <span class="nav-text">下载镜像</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A1%A5%E6%8E%A5%E7%BD%91%E7%BB%9C%E6%96%B9%E6%A1%88"><span class="nav-number">3.2.</span> <span class="nav-text">桥接网络方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BD%91%E7%BB%9C%E9%85%8D%E7%BD%AE"><span class="nav-number">3.2.1.</span> <span class="nav-text">网络配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%AE%89%E8%A3%85"><span class="nav-number">3.2.2.</span> <span class="nav-text">虚拟机安装</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NAT%E7%BD%91%E7%BB%9C%E6%96%B9%E6%A1%88"><span class="nav-number">3.3.</span> <span class="nav-text">NAT网络方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%AE%89%E8%A3%85-1"><span class="nav-number">3.3.1.</span> <span class="nav-text">虚拟机安装</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%85%B6%E4%BB%96"><span class="nav-number">4.</span> <span class="nav-text">其他</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B8%B8%E7%94%A8%E5%91%BD%E4%BB%A4"><span class="nav-number">4.1.</span> <span class="nav-text">常用命令</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-name">tags</span>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

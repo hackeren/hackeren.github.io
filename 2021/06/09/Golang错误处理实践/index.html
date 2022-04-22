@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="1 常见的错误处理方式 1.1 sentinel error 1.1.1 概述 1.1.2 缺点 sentinel errors会成为API公共部分 sentinel errors在两个包直接建立了依赖   1.1.3 结论   1.2 error types 1.2.1 概述 1.2.2 缺点 1.2.3 结论   1.3 opaque error 1.3.1 概述     2 建议的错误">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Golang错误处理实践">
+<meta property="og:url" content="http://example.com/2021/06/09/Golang%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E5%AE%9E%E8%B7%B5/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="1 常见的错误处理方式 1.1 sentinel error 1.1.1 概述 1.1.2 缺点 sentinel errors会成为API公共部分 sentinel errors在两个包直接建立了依赖   1.1.3 结论   1.2 error types 1.2.1 概述 1.2.2 缺点 1.2.3 结论   1.3 opaque error 1.3.1 概述     2 建议的错误">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2021-06-08T22:51:56.000Z">
+<meta property="article:modified_time" content="2021-07-15T02:16:17.787Z">
+<meta property="article:author" content="John Doe">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2021/06/09/Golang%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E5%AE%9E%E8%B7%B5/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Golang错误处理实践 | Hexo</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Hexo</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/06/09/Golang%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E5%AE%9E%E8%B7%B5/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Hexo">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Golang错误处理实践
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-06-09 06:51:56" itemprop="dateCreated datePublished" datetime="2021-06-09T06:51:56+08:00">2021-06-09</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2021-07-15 10:16:17" itemprop="dateModified" datetime="2021-07-15T10:16:17+08:00">2021-07-15</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <!-- TOC GFM -->
+
+<ul>
+<li><a href="#1-%E5%B8%B8%E8%A7%81%E7%9A%84%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E6%96%B9%E5%BC%8F">1 常见的错误处理方式</a><ul>
+<li><a href="#11-sentinel-error">1.1 sentinel error</a><ul>
+<li><a href="#111-%E6%A6%82%E8%BF%B0">1.1.1 概述</a></li>
+<li><a href="#112-%E7%BC%BA%E7%82%B9">1.1.2 缺点</a><ul>
+<li><a href="#sentinel-errors%E4%BC%9A%E6%88%90%E4%B8%BAapi%E5%85%AC%E5%85%B1%E9%83%A8%E5%88%86">sentinel errors会成为API公共部分</a></li>
+<li><a href="#sentinel-errors%E5%9C%A8%E4%B8%A4%E4%B8%AA%E5%8C%85%E7%9B%B4%E6%8E%A5%E5%BB%BA%E7%AB%8B%E4%BA%86%E4%BE%9D%E8%B5%96">sentinel errors在两个包直接建立了依赖</a></li>
+</ul>
+</li>
+<li><a href="#113-%E7%BB%93%E8%AE%BA">1.1.3 结论</a></li>
+</ul>
+</li>
+<li><a href="#12-error-types">1.2 error types</a><ul>
+<li><a href="#121-%E6%A6%82%E8%BF%B0">1.2.1 概述</a></li>
+<li><a href="#122-%E7%BC%BA%E7%82%B9">1.2.2 缺点</a></li>
+<li><a href="#123-%E7%BB%93%E8%AE%BA">1.2.3 结论</a></li>
+</ul>
+</li>
+<li><a href="#13-opaque-error">1.3 opaque error</a><ul>
+<li><a href="#131-%E6%A6%82%E8%BF%B0">1.3.1 概述</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#2-%E5%BB%BA%E8%AE%AE%E7%9A%84%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E6%96%B9%E5%BC%8F">2 建议的错误处理方式</a><ul>
+<li><a href="#21-indented-flow-is-for-error">2.1 indented flow is for error</a></li>
+<li><a href="#22-eliminate-error-handling-by-eliminating-errors">2.2 Eliminate error handling by eliminating errors</a></li>
+<li><a href="#23-wrap-errors">2.3 wrap errors</a><ul>
+<li><a href="#231-%E6%A6%82%E8%BF%B0">2.3.1 概述</a></li>
+<li><a href="#232-%E5%AE%9E%E8%B7%B5">2.3.2 实践</a></li>
+<li><a href="#233-%E7%BB%93%E8%AE%BA">2.3.3 结论</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#3-go113%E7%9A%84%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86">3 Go1.13的错误处理</a><ul>
+<li><a href="#31-go113%E4%B9%8B%E5%89%8D%E7%9A%84%E5%A4%84%E7%90%86%E6%96%B9%E5%BC%8F">3.1 Go1.13之前的处理方式</a></li>
+<li><a href="#32-go113%E4%B9%8B%E5%90%8E%E7%9A%84%E5%A4%84%E7%90%86%E6%96%B9%E5%BC%8F">3.2 Go1.13之后的处理方式</a></li>
+</ul>
+</li>
+<li><a href="#4-%E5%85%B6%E4%BB%96%E5%BB%BA%E8%AE%AE">4 其他建议</a></li>
+</ul>
+<!-- /TOC -->
+
+<h1 id="1-常见的错误处理方式"><a href="#1-常见的错误处理方式" class="headerlink" title="1 常见的错误处理方式"></a>1 常见的错误处理方式</h1><h2 id="1-1-sentinel-error"><a href="#1-1-sentinel-error" class="headerlink" title="1.1 sentinel error"></a>1.1 sentinel error</h2><h3 id="1-1-1-概述"><a href="#1-1-1-概述" class="headerlink" title="1.1.1 概述"></a>1.1.1 概述</h3><p>预定义的特定错误，称为sentinel error</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> err == ErrSomething &#123;</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>类似<code>io.EOF</code></p>
+</blockquote>
+<p>该方式是最不灵活的处理策略，调用方必须使用==将结果与预先声明的值进行比较。当需要提供更多的上下文时，当返回一个不同的错误时，将直接破坏相等性检查。<br>当使用<code>fmt.Errorf</code> 携带上下文或包装时，将破坏包的兼容性，调用者将被迫查看<code>error.Error()</code> 方法的输出，以便查看它是否符合特定的字符串。</p>
+<p><strong>不依赖检查<code>error.Error</code> 的输出</strong></p>
+<p>不应该依赖检测<code>error.Error</code> 的输出，该方法存在于<code>error</code> 接口主要用于方便程序员使用字符串到日志或标准输出等。</p>
+<h3 id="1-1-2-缺点"><a href="#1-1-2-缺点" class="headerlink" title="1.1.2 缺点"></a>1.1.2 缺点</h3><h4 id="sentinel-errors会成为API公共部分"><a href="#sentinel-errors会成为API公共部分" class="headerlink" title="sentinel errors会成为API公共部分"></a>sentinel errors会成为API公共部分</h4><ol>
+<li>如果公共函数或方法返回一个特定值的错误，那么该值必须是公共的，因此必须通过加文档来说明，增大了API的表面积；</li>
+<li>如果API定义了一个返回特定错误的接口，那所有实现该接口的实现将被限制为仅返回该错误。</li>
+</ol>
+<blockquote>
+<p><code>io.Reader</code> 接口，像<code>io.Copy</code> 这类函数要求接口实现者只能通过返回<code>io.EOF</code> 来告诉调用者没有更多的数据，<br>但实际上这并不是错误。</p>
+</blockquote>
+<h4 id="sentinel-errors在两个包直接建立了依赖"><a href="#sentinel-errors在两个包直接建立了依赖" class="headerlink" title="sentinel errors在两个包直接建立了依赖"></a>sentinel errors在两个包直接建立了依赖</h4><p>最糟糕的是，sentinel error在两个包之间建立了源码级的依赖。因为当你需要检查错误是否为<code>io.EOF</code> 时，必须包含io包。</p>
+<h3 id="1-1-3-结论"><a href="#1-1-3-结论" class="headerlink" title="1.1.3 结论"></a>1.1.3 结论</h3><p>虽然在标准库中存在大量的使用sentinel errors的情况，但sentinel errors不是一个应该被模仿的实践方式。</p>
+<h2 id="1-2-error-types"><a href="#1-2-error-types" class="headerlink" title="1.2 error types"></a>1.2 error types</h2><h3 id="1-2-1-概述"><a href="#1-2-1-概述" class="headerlink" title="1.2.1 概述"></a>1.2.1 概述</h3><p>error types是实现了error接口的自定义类型。如下：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> MyError <span class="keyword">struct</span> &#123;</span><br><span class="line">	Msg <span class="keyword">string</span></span><br><span class="line">	File sring</span><br><span class="line">	Line <span class="keyword">int</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(e *MyError)</span> <span class="title">Error</span> <span class="title">string</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> fmt.Sprintf(<span class="string">&quot;%s:%d:%s&quot;</span>, e.File, e.Line, e.Msg)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">test</span><span class="params">()</span> <span class="title">Error</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> &amp;MyError&#123;Msg: <span class="string">&quot;my error&quot;</span>, File: <span class="string">&quot;my_error.go&quot;</span>, Line: <span class="number">40</span>&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>可以扩展error来携带更多的上下文。</p>
+<p>因为MyError是一个类型，调用者可以使用断言转换成这个类型，来获取更多的上下文，例如：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">	err := test()</span><br><span class="line">	<span class="keyword">switch</span> err := err.(<span class="keyword">type</span>) &#123;</span><br><span class="line">	<span class="keyword">case</span> <span class="literal">nil</span>:</span><br><span class="line">		<span class="comment">// succeed, nothing to do</span></span><br><span class="line">	<span class="keyword">case</span> *MyError:</span><br><span class="line">		fmt.Println(<span class="string">&quot;error occured on line:&quot;</span>, err.Line)</span><br><span class="line">	<span class="keyword">default</span>:</span><br><span class="line">		<span class="comment">// unknown error</span></span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>案例：标准库中实现的<code>type PathError</code>就是比较经典的error types实践。</p>
+<h3 id="1-2-2-缺点"><a href="#1-2-2-缺点" class="headerlink" title="1.2.2 缺点"></a>1.2.2 缺点</h3><p>调用者使用类型断言和类型switch，会让自定义的error成为public，将产生调用者与被调用者之间的强耦合，让API变的脆弱。</p>
+<h3 id="1-2-3-结论"><a href="#1-2-3-结论" class="headerlink" title="1.2.3 结论"></a>1.2.3 结论</h3><p>尽量避免使用error types这种方法，因为该方法虽然能够获得更多的自定义的上下文信息，但是仍然存在和sentinel error许多相关的问题。<br>因此，至少要避免error types成为公共API的一部分。</p>
+<h2 id="1-3-opaque-error"><a href="#1-3-opaque-error" class="headerlink" title="1.3 opaque error"></a>1.3 opaque error</h2><h3 id="1-3-1-概述"><a href="#1-3-1-概述" class="headerlink" title="1.3.1 概述"></a>1.3.1 概述</h3><p>最灵活的错误处理方式，解除调用者与被调用之间的耦合。虽然调用者知道了错误，但是没有能力知道错误的内部,只返回成功或者失败。<br>某些情况下，需要对特定的错误进行处理，采用<code>&quot;assert errors for behaviour not type&quot;</code> ，例如：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> net</span><br><span class="line"><span class="comment">// An Error represents a network error.</span></span><br><span class="line"><span class="keyword">type</span> Error <span class="keyword">interface</span> &#123;</span><br><span class="line">	error</span><br><span class="line">	Timeout() <span class="keyword">bool</span>   <span class="comment">// Is the error a timeout?</span></span><br><span class="line">	Temporary() <span class="keyword">bool</span> <span class="comment">// Is the error temporary?</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> OpError <span class="keyword">struct</span> &#123;</span><br><span class="line">	<span class="comment">// Op is the operation which caused the error, such as</span></span><br><span class="line">	<span class="comment">// &quot;read&quot; or &quot;write&quot;.</span></span><br><span class="line">	Op <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// Net is the network type on which this error occurred,</span></span><br><span class="line">	<span class="comment">// such as &quot;tcp&quot; or &quot;udp6&quot;.</span></span><br><span class="line">	Net <span class="keyword">string</span></span><br><span class="line">	...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> temporary <span class="keyword">interface</span> &#123;</span><br><span class="line">	Temporary() <span class="keyword">bool</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(e *OpError)</span> <span class="title">Temporary</span><span class="params">()</span> <span class="title">bool</span></span> &#123;</span><br><span class="line">	<span class="comment">// Treat ECONNRESET and ECONNABORTED as temporary errors when</span></span><br><span class="line">	<span class="comment">// they come from calling accept. See issue 6163.</span></span><br><span class="line">	<span class="keyword">if</span> e.Op == <span class="string">&quot;accept&quot;</span> &amp;&amp; isConnError(e.Err) &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> ne, ok := e.Err.(*os.SyscallError); ok &#123;</span><br><span class="line">		t, ok := ne.Err.(temporary)</span><br><span class="line">		<span class="keyword">return</span> ok &amp;&amp; t.Temporary()</span><br><span class="line">	&#125;</span><br><span class="line">	t, ok := e.Err.(temporary)</span><br><span class="line">	<span class="keyword">return</span> ok &amp;&amp; t.Temporary()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// caller use</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">IsTemporay</span><span class="params">(err error)</span> <span class="title">bool</span></span> &#123;</span><br><span class="line">	te, ok := err.(temporary)</span><br><span class="line">	<span class="keyword">return</span> ok &amp;&amp; te.Temporary()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>该方法的关键是可以在不需要导入定义错误的包或者实际上不了解err的底层类型的情况下，实现错误处理，即我们只对行为感兴趣。</p>
+<h1 id="2-建议的错误处理方式"><a href="#2-建议的错误处理方式" class="headerlink" title="2 建议的错误处理方式"></a>2 建议的错误处理方式</h1><h2 id="2-1-indented-flow-is-for-error"><a href="#2-1-indented-flow-is-for-error" class="headerlink" title="2.1 indented flow is for error"></a>2.1 indented flow is for error</h2><p>无错误的正常流程代码，将成为一条执行，而不是缩进的代码。</p>
+<p><strong>推荐的方案</strong> </p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">f, err := os.Open(path)</span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">	<span class="comment">// handle error</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// do stuff</span></span><br></pre></td></tr></table></figure>
+<p><strong>不推荐的方案</strong></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">f, err := os.Open(path)</span><br><span class="line"><span class="keyword">if</span> err == <span class="literal">nil</span> &#123;</span><br><span class="line">	<span class="comment">// do stuff</span></span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">	<span class="comment">// handle error</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>符合<code>**fast-failure**</code> 原则</p>
+<h2 id="2-2-Eliminate-error-handling-by-eliminating-errors"><a href="#2-2-Eliminate-error-handling-by-eliminating-errors" class="headerlink" title="2.2 Eliminate error handling by eliminating errors"></a>2.2 Eliminate error handling by eliminating errors</h2><p>*<em>推荐的方案</em><br>减少无效代码</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">AuthenticateRequest</span><span class="params">(r **request)</span> <span class="title">error</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> authenticate(r.User)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>不**推荐的方案</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">AuthenticateRequest</span><span class="params">(r **request)</span> <span class="title">error</span></span> &#123;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> err := authenticate(r.User); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="2-3-wrap-errors"><a href="#2-3-wrap-errors" class="headerlink" title="2.3 wrap errors"></a>2.3 wrap errors</h2><h3 id="2-3-1-概述"><a href="#2-3-1-概述" class="headerlink" title="2.3.1 概述"></a>2.3.1 概述</h3><p>总体原则是，一个错误只处理一次，<br>当直接将下层错误抛出到上层后，上层打印出的错误信息将因为太底层而失真。最简单的处理方法是直接使用fmt.Errorf()将错误进行包装后抛出。<br>常见的处理方式是，调用接口若返回错误，将先进行打印后再抛出到上层。该方法在一个错误时，每一层都会打印一次，造成排查困难。</p>
+<h3 id="2-3-2-实践"><a href="#2-3-2-实践" class="headerlink" title="2.3.2 实践"></a>2.3.2 实践</h3><p>日志记录与错误无关且对调试没有帮助的信息应被视为噪音。记录日志是因为某些东西失败了，而且日志包含了答案。</p>
+<ul>
+<li>错误日志要被记录</li>
+<li>应用程序处理错误，保证100%完整性</li>
+<li>之后不会再报告当前错误</li>
+</ul>
+<p><a target="_blank" rel="noopener" href="https://github.com/pkg/errors">github.com/pkg.errors</a> 的wrap方法可以携带错误的根因及消息。并且通过cause方法获取堆栈上下文和根因。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//<span class="doctag">TODO:</span></span></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-3-3-结论"><a href="#2-3-3-结论" class="headerlink" title="2.3.3 结论"></a>2.3.3 结论</h3><p>结合具体的使用常见，我们总结如下的实践方法：</p>
+<ul>
+<li>在应用代码中，使用errors.New或者errors.Errorf()返回错误，即：<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">return</span> errors.Errorf(<span class="string">&quot;not enough arguements, expected at least ...&quot;</span>)</span><br></pre></td></tr></table></figure></li>
+<li>如果调用其他包内(同一个project包内的函数)的函数，通常简单的直接返回，即：<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">	<span class="keyword">return</span> err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li>如果和其他第三方库协作（标准库等），即调用外部包的最底层函数，需要使用errors.Wrap() 或errors.Wrapf()保存堆栈信息；</li>
+<li>直接返回错误，而不是每个错误的地方都打印日志；</li>
+<li>在程序的顶部或者是工作的goroutine顶部（请求入口），使用<code>%+v</code> 把堆栈详情进行记录；</li>
+<li>使用errors.Cause()获取root error，再进行和sentinel error判定；</li>
+<li>Package the are reusable across many projects only return root error values.<br>基础库不能返回wrap后的error，只能返回特定的错误码。</li>
+<li>If the error is not going to be handled, wrap and return up the call stack.<br>这是关于函数/方法调用返回的每个错误的基本问题。如果函数/方法不打算处理错误，那么用足够的上下文wrap errors<br>并将其返回到调用堆栈中。例如，额外的上下文可以是使用的输入参数或者失败的查询语句。确定记录的上下文是足够<br>还是太多的一个好方法是检查日志并验证它们在开发期间是否为你工作。</li>
+<li>Once an error is handled, it is not allowed to be passed up the call stack any longer.<br>一旦确定函数/方法将处理错误，错误则不再是错误。如果函数/方法仍然需要发出返回，则它不能返回错误值。它应该只返回0.</li>
+</ul>
+<h1 id="3-Go1-13的错误处理"><a href="#3-Go1-13的错误处理" class="headerlink" title="3 Go1.13的错误处理"></a>3 Go1.13的错误处理</h1><h2 id="3-1-Go1-13之前的处理方式"><a href="#3-1-Go1-13之前的处理方式" class="headerlink" title="3.1 Go1.13之前的处理方式"></a>3.1 Go1.13之前的处理方式</h2><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 最简单的</span></span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">	<span class="comment">// do some stuff</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 检查sentinel error</span></span><br><span class="line"><span class="keyword">var</span> ErrNotFound = errors.New(<span class="string">&quot;not found&quot;</span>)</span><br><span class="line"><span class="keyword">if</span> err == ErrNotFound &#123;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 使用断言获取更丰富的信息</span></span><br><span class="line"><span class="keyword">type</span> NotFoundError <span class="keyword">struct</span> &#123;</span><br><span class="line">	Name <span class="keyword">string</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(e *NotFoundError)</span> <span class="title">Error</span><span class="params">()</span> <span class="title">string</span></span> &#123;<span class="keyword">return</span> e.Name+ <span class="string">&quot;: not found&quot;</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> e, ok := er.(*NotFoundError); ok &#123;</span><br><span class="line">	<span class="comment">// do some stuff</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">// 添加函数调用栈信息</span></span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">	<span class="keyword">return</span> fmt.Errorf(<span class="string">&quot;decompress %v: %v&quot;</span>, name, err)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 自定义类型的错误</span></span><br><span class="line"><span class="keyword">type</span> QueryError <span class="keyword">struct</span> &#123;</span><br><span class="line">	Query <span class="keyword">string</span></span><br><span class="line">	Err error</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> e, ok := err.(*QueryError; ok &amp;&amp; e.Err == ErrPermission)&#123;</span><br><span class="line">	<span class="comment">// do some stuff</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="3-2-Go1-13之后的处理方式"><a href="#3-2-Go1-13之后的处理方式" class="headerlink" title="3.2 Go1.13之后的处理方式"></a>3.2 Go1.13之后的处理方式</h2><p>Go1.13为errors和fmt标准库包引入了新特性，以简化处理包含其他错误的错误。包含另外一个错误的错误可以实现返回底层错误的Unwrap方法。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(e *QueryError)</span> <span class="title">Unwrap</span><span class="params">()</span> <span class="title">error</span></span> &#123;<span class="keyword">return</span> e.Err&#125;</span><br><span class="line"><span class="comment">//Is - 等价于err == ErrorNotFound</span></span><br><span class="line"><span class="keyword">if</span> errors.Is(err, ErrNotFound) &#123;</span><br><span class="line">	<span class="comment">// do some stuff</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//As - 等价于if e, ok = err.(*QueryError); ok &#123;&#125; </span></span><br><span class="line"><span class="keyword">var</span> e *QueryError</span><br><span class="line"><span class="keyword">if</span> errors.As(err, &amp;e) &#123;</span><br><span class="line">	<span class="comment">// do some stuff</span></span><br><span class="line">	</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>缺点：未包含上下文信息</p>
+<p><strong>如何包装错误</strong></p>
+<ul>
+<li>使用fmt.Errorf()来添加信息</li>
+<li>fmt.Errorf()中使用%w谓词来包装错误，可以使用Is和As方法</li>
+</ul>
+<h1 id="4-其他建议"><a href="#4-其他建议" class="headerlink" title="4 其他建议"></a>4 其他建议</h1><ul>
+<li><input disabled type="checkbox"> 在一个系统内部，不建议不定义全局错误码，A调用B接口，转换成A定义的错误码，而不是直接抛出。交互的双方之间定义错误码即可。</li>
+<li><input disabled type="checkbox"> 如果A通过gRPC调用B的接口，B可以在protobuf文件中定义返回码枚举值，生成IsNotFound()这里函数由A调用。</li>
+<li><input disabled type="checkbox"> 如果是通过http协议实现的restful API，接口提供方应该将错误进行归类到http标准返回码的大类中，然后在body中携带更细的返回码等信息。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/2021/07/10/%E9%98%B2%E5%BE%A1%E5%BC%8F%E7%BC%96%E7%A8%8B/" rel="next" title="防御式编程">
+      防御式编程 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E5%B8%B8%E8%A7%81%E7%9A%84%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E6%96%B9%E5%BC%8F"><span class="nav-number">1.</span> <span class="nav-text">1 常见的错误处理方式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-sentinel-error"><span class="nav-number">1.1.</span> <span class="nav-text">1.1 sentinel error</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-1-%E6%A6%82%E8%BF%B0"><span class="nav-number">1.1.1.</span> <span class="nav-text">1.1.1 概述</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-2-%E7%BC%BA%E7%82%B9"><span class="nav-number">1.1.2.</span> <span class="nav-text">1.1.2 缺点</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#sentinel-errors%E4%BC%9A%E6%88%90%E4%B8%BAAPI%E5%85%AC%E5%85%B1%E9%83%A8%E5%88%86"><span class="nav-number">1.1.2.1.</span> <span class="nav-text">sentinel errors会成为API公共部分</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#sentinel-errors%E5%9C%A8%E4%B8%A4%E4%B8%AA%E5%8C%85%E7%9B%B4%E6%8E%A5%E5%BB%BA%E7%AB%8B%E4%BA%86%E4%BE%9D%E8%B5%96"><span class="nav-number">1.1.2.2.</span> <span class="nav-text">sentinel errors在两个包直接建立了依赖</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-3-%E7%BB%93%E8%AE%BA"><span class="nav-number">1.1.3.</span> <span class="nav-text">1.1.3 结论</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-error-types"><span class="nav-number">1.2.</span> <span class="nav-text">1.2 error types</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-1-%E6%A6%82%E8%BF%B0"><span class="nav-number">1.2.1.</span> <span class="nav-text">1.2.1 概述</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-2-%E7%BC%BA%E7%82%B9"><span class="nav-number">1.2.2.</span> <span class="nav-text">1.2.2 缺点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-3-%E7%BB%93%E8%AE%BA"><span class="nav-number">1.2.3.</span> <span class="nav-text">1.2.3 结论</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-3-opaque-error"><span class="nav-number">1.3.</span> <span class="nav-text">1.3 opaque error</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-3-1-%E6%A6%82%E8%BF%B0"><span class="nav-number">1.3.1.</span> <span class="nav-text">1.3.1 概述</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E5%BB%BA%E8%AE%AE%E7%9A%84%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E6%96%B9%E5%BC%8F"><span class="nav-number">2.</span> <span class="nav-text">2 建议的错误处理方式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-indented-flow-is-for-error"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 indented flow is for error</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-Eliminate-error-handling-by-eliminating-errors"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 Eliminate error handling by eliminating errors</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-wrap-errors"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 wrap errors</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-1-%E6%A6%82%E8%BF%B0"><span class="nav-number">2.3.1.</span> <span class="nav-text">2.3.1 概述</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-2-%E5%AE%9E%E8%B7%B5"><span class="nav-number">2.3.2.</span> <span class="nav-text">2.3.2 实践</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-3-%E7%BB%93%E8%AE%BA"><span class="nav-number">2.3.3.</span> <span class="nav-text">2.3.3 结论</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Go1-13%E7%9A%84%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">3 Go1.13的错误处理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-Go1-13%E4%B9%8B%E5%89%8D%E7%9A%84%E5%A4%84%E7%90%86%E6%96%B9%E5%BC%8F"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 Go1.13之前的处理方式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-Go1-13%E4%B9%8B%E5%90%8E%E7%9A%84%E5%A4%84%E7%90%86%E6%96%B9%E5%BC%8F"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 Go1.13之后的处理方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E5%85%B6%E4%BB%96%E5%BB%BA%E8%AE%AE"><span class="nav-number">4.</span> <span class="nav-text">4 其他建议</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-name">tags</span>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
